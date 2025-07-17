@@ -1,0 +1,9 @@
+{
+	"name": "dataflowsDF",
+	"location": "westus2",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "8107c351-0dde-40ea-a35a-983624a41fb0",
+		"tenantId": "340082c4-08ff-4a1b-b9c6-15a37011dcd7"
+	}
+}
