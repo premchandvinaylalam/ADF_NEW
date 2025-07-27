@@ -1,0 +1,9 @@
+{
+	"name": "WInADFprac",
+	"location": "westus2",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "5e95dd29-021f-4fe0-bf4f-f84aaa7ddaec",
+		"tenantId": "340082c4-08ff-4a1b-b9c6-15a37011dcd7"
+	}
+}

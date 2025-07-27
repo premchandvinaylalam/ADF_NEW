@@ -6,74 +6,31 @@
 			"sources": [
 				{
 					"dataset": {
-						"referenceName": "DS_Cust_source",
+						"referenceName": "DS_creditscore_source",
 						"type": "DatasetReference"
 					},
-					"name": "customer"
-				},
-				{
-					"dataset": {
-						"referenceName": "DS_ORDER_source",
-						"type": "DatasetReference"
-					},
-					"name": "order"
+					"name": "creditscore"
 				}
 			],
 			"sinks": [
 				{
 					"dataset": {
-						"referenceName": "DelimitedText1_inida",
+						"referenceName": "DS_sinkrejrecords",
 						"type": "DatasetReference"
 					},
-					"name": "sink1",
-					"rejectedDataLinkedService": {
-						"referenceName": "AzureDataLakeStorage1",
-						"type": "LinkedServiceReference"
-					}
+					"name": "sinkrejrecords"
 				},
 				{
 					"dataset": {
-						"referenceName": "DelimitedText1_uk",
+						"referenceName": "DS_allrecords",
 						"type": "DatasetReference"
 					},
-					"name": "sink2",
-					"rejectedDataLinkedService": {
-						"referenceName": "AzureDataLakeStorage1",
-						"type": "LinkedServiceReference"
-					}
-				},
-				{
-					"dataset": {
-						"referenceName": "DelimitedText1_usa",
-						"type": "DatasetReference"
-					},
-					"name": "sink3",
-					"rejectedDataLinkedService": {
-						"referenceName": "AzureDataLakeStorage1",
-						"type": "LinkedServiceReference"
-					}
-				},
-				{
-					"dataset": {
-						"referenceName": "DelimitedText1_iother",
-						"type": "DatasetReference"
-					},
-					"name": "sink4",
-					"rejectedDataLinkedService": {
-						"referenceName": "AzureDataLakeStorage1",
-						"type": "LinkedServiceReference"
-					}
+					"name": "allrecords"
 				}
 			],
 			"transformations": [
 				{
-					"name": "renamecust"
-				},
-				{
-					"name": "renameorder"
-				},
-				{
-					"name": "join1"
+					"name": "windowrn"
 				},
 				{
 					"name": "filter1"
@@ -82,101 +39,91 @@
 					"name": "select1"
 				},
 				{
-					"name": "split1"
+					"name": "sort1"
+				},
+				{
+					"name": "filter2"
+				},
+				{
+					"name": "select2"
+				},
+				{
+					"name": "window1"
 				}
 			],
 			"scriptLines": [
 				"source(output(",
-				"          CustomerID as integer,",
-				"          CustomerName as string,",
-				"          ContactName as string,",
-				"          Country as string",
+				"          Credit_ID as integer,",
+				"          Card_Type as string,",
+				"          Credit_Name as string,",
+				"          Credit_score as integer",
 				"     ),",
 				"     allowSchemaDrift: true,",
 				"     validateSchema: false,",
-				"     ignoreNoFilesFound: false,",
-				"     partitionBy('hash', 1)) ~> customer",
-				"source(output(",
-				"          CustomerID as integer,",
-				"          OrderName as string,",
-				"          OrderDate as string",
-				"     ),",
-				"     allowSchemaDrift: true,",
-				"     validateSchema: false,",
-				"     ignoreNoFilesFound: false,",
-				"     partitionBy('hash', 1)) ~> order",
-				"customer select(mapColumn(",
-				"          cust_CustomerID = CustomerID,",
-				"          CustomerName,",
-				"          ContactName,",
-				"          Country",
-				"     ),",
-				"     partitionBy('hash', 1),",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> renamecust",
-				"order select(mapColumn(",
-				"          order_CustomerID = CustomerID,",
-				"          OrderName,",
-				"          OrderDate",
-				"     ),",
-				"     partitionBy('hash', 1),",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> renameorder",
-				"renamecust, renameorder join(cust_CustomerID == order_CustomerID,",
-				"     joinType:'left',",
-				"     matchType:'exact',",
-				"     ignoreSpaces: false,",
-				"     partitionBy('hash', 1),",
-				"     broadcast: 'auto')~> join1",
-				"join1 filter(isNull(order_CustomerID),",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table',",
+				"     partitionBy('hash', 1)) ~> creditscore",
+				"creditscore window(over(Card_Type,",
+				"          Credit_Name,",
+				"          Credit_score),",
+				"     desc(Credit_score, true),",
+				"     rownumber = rowNumber(),",
+				"     partitionBy('hash', 1)) ~> windowrn",
+				"windowrn filter(greater(rownumber, 1),",
 				"     partitionBy('hash', 1)) ~> filter1",
 				"filter1 select(mapColumn(",
-				"          cust_CustomerID,",
-				"          CustomerName,",
-				"          ContactName,",
-				"          Country",
+				"          Credit_ID,",
+				"          Card_Type,",
+				"          Credit_Name,",
+				"          Credit_score",
 				"     ),",
 				"     partitionBy('hash', 1),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> select1",
-				"select1 split(equals(Country, 'india'),",
-				"     equals(Country, 'uk'),",
-				"     equals(Country, 'usa'),",
-				"     !(Country=='india'||Country=='usa'||Country=='uk'),",
-				"     disjoint: false,",
-				"     partitionBy('hash', 1)) ~> split1@(india, uk, usa, others)",
-				"split1@india sink(allowSchemaDrift: true,",
+				"select1 sort(asc(Credit_score, true),",
+				"     partitionBy('hash', 1)) ~> sort1",
+				"windowrn filter(equals(rownumber, 1),",
+				"     partitionBy('hash', 1)) ~> filter2",
+				"window1 select(mapColumn(",
+				"          Credit_ID,",
+				"          Card_Type,",
+				"          Credit_Name,",
+				"          Credit_score,",
+				"          rownumber,",
+				"          rank,",
+				"          denserank",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select2",
+				"filter2 window(over(Card_Type),",
+				"     desc(Credit_score, true),",
+				"     rank = rank(),",
+				"          denserank = denseRank(),",
+				"     partitionBy('hash', 1)) ~> window1",
+				"sort1 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
-				"     umask: 0022,",
-				"     preCommands: [],",
-				"     postCommands: [],",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     recreate:true,",
+				"     format: 'table',",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     partitionBy('hash', 1)) ~> sink1",
-				"split1@uk sink(allowSchemaDrift: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     partitionBy('hash', 1)) ~> sinkrejrecords",
+				"select2 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
-				"     umask: 0022,",
-				"     preCommands: [],",
-				"     postCommands: [],",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     recreate:true,",
+				"     format: 'table',",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     partitionBy('hash', 1)) ~> sink2",
-				"split1@usa sink(allowSchemaDrift: true,",
-				"     validateSchema: false,",
-				"     umask: 0022,",
-				"     preCommands: [],",
-				"     postCommands: [],",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true,",
-				"     partitionBy('hash', 1)) ~> sink3",
-				"split1@others sink(allowSchemaDrift: true,",
-				"     validateSchema: false,",
-				"     umask: 0022,",
-				"     preCommands: [],",
-				"     postCommands: [],",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true,",
-				"     partitionBy('hash', 1)) ~> sink4"
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     partitionBy('hash', 1)) ~> allrecords"
 			]
 		}
 	}
