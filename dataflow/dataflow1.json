@@ -1,0 +1,130 @@
+{
+	"name": "dataflow1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_creditscore_source",
+						"type": "DatasetReference"
+					},
+					"name": "creditscore"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_sinkrejrecords",
+						"type": "DatasetReference"
+					},
+					"name": "sinkrejrecords"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_allrecords",
+						"type": "DatasetReference"
+					},
+					"name": "allrecords"
+				}
+			],
+			"transformations": [
+				{
+					"name": "windowrn"
+				},
+				{
+					"name": "filter1"
+				},
+				{
+					"name": "select1"
+				},
+				{
+					"name": "sort1"
+				},
+				{
+					"name": "filter2"
+				},
+				{
+					"name": "select2"
+				},
+				{
+					"name": "window1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          Credit_ID as integer,",
+				"          Card_Type as string,",
+				"          Credit_Name as string,",
+				"          Credit_score as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table',",
+				"     partitionBy('hash', 1)) ~> creditscore",
+				"creditscore window(over(Card_Type,",
+				"          Credit_Name,",
+				"          Credit_score),",
+				"     desc(Credit_score, true),",
+				"     rownumber = rowNumber(),",
+				"     partitionBy('hash', 1)) ~> windowrn",
+				"windowrn filter(greater(rownumber, 1),",
+				"     partitionBy('hash', 1)) ~> filter1",
+				"filter1 select(mapColumn(",
+				"          Credit_ID,",
+				"          Card_Type,",
+				"          Credit_Name,",
+				"          Credit_score",
+				"     ),",
+				"     partitionBy('hash', 1),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 sort(asc(Credit_score, true),",
+				"     partitionBy('hash', 1)) ~> sort1",
+				"windowrn filter(equals(rownumber, 1),",
+				"     partitionBy('hash', 1)) ~> filter2",
+				"window1 select(mapColumn(",
+				"          Credit_ID,",
+				"          Card_Type,",
+				"          Credit_Name,",
+				"          Credit_score,",
+				"          rownumber,",
+				"          rank,",
+				"          denserank",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select2",
+				"filter2 window(over(Card_Type),",
+				"     desc(Credit_score, true),",
+				"     rank = rank(),",
+				"          denserank = denseRank(),",
+				"     partitionBy('hash', 1)) ~> window1",
+				"sort1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     recreate:true,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     partitionBy('hash', 1)) ~> sinkrejrecords",
+				"select2 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     recreate:true,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     partitionBy('hash', 1)) ~> allrecords"
+			]
+		}
+	}
+}

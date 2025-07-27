@@ -1,0 +1,17 @@
+{
+	"name": "DS_allrecords",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase1",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "all records"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
